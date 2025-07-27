@@ -35,6 +35,29 @@ A comprehensive plugin for [EDMC](https://github.com/EDCD/EDMarketConnector) tha
 - **MK II cargo rack support** with enhanced capacity detection
 - **Large number support** for high-value transactions
 
+## Screenshots
+
+### Main Plugin Interface
+![Main Interface](https://i.imgur.com/AZejkZ3.png)
+
+### Discord Webhook Notifications
+![Discord Webhook](https://i.imgur.com/4FalSe2.png)
+
+### Settings Configuration
+![Settings Panel](https://i.imgur.com/oZLhR3q.png)
+
+### Trading Analytics Display
+![Trading Analytics](https://i.imgur.com/uIAQksG.png)
+
+### Cargo Racks Analysis
+![Cargo Racks](https://i.imgur.com/7TqoR8U.png)
+
+### Budget Tracking Interface
+![Budget Tracking](https://i.imgur.com/ytOctAN.png)
+
+### Captain Information Display
+![Captain Info](https://i.imgur.com/AmR2TTe.png)
+
 ## Installation
 
 1. Download the [latest release](https://github.com/inerdy/cargo-manifest-remastered/releases)
@@ -122,15 +145,7 @@ The plugin automatically tracks:
 - **Total trade performance** across sessions
 - **Budget progress** toward credit goals
 
-## Version History
 
-### v3.0.1 (Current)
-- Enhanced Discord integration
-- Budget tracking system
-- Cargo rack analysis
-- Captain information display
-- MK II cargo rack support
-- Improved UI with multi-section interface
 
 ## Troubleshooting
 
@@ -138,7 +153,7 @@ The plugin automatically tracks:
 - **Cargo not displaying**: Check EDMC version compatibility
 - **Webhooks not working**: Verify webhook URL and permissions
 - **Ranks not showing**: Ensure game is generating journal events
-- **MK II racks not detected**: Plugin will auto-detect based on capacity
+- **MK II racks not detected**: Plugin will auto-detect based on capacity (dosen't seem to work correclty)
 
 ### Debug Logging
 The plugin creates debug logs in the plugin directory for troubleshooting.
