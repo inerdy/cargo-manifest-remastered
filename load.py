@@ -63,7 +63,7 @@ this.version = 'v3.0.1'
 
 def checkVersion():
 	try:
-		req = requests.get(url='https://api.github.com/repos/RemainNA/cargo-manifest/releases/latest')
+		req = requests.get(url='https://api.github.com/repos/inerdy/cargo-manifest-remastered/releases/latest')
 	except:
 		return -1
 	if not req.status_code == requests.codes.ok:
