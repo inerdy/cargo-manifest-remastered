@@ -38,25 +38,25 @@ A comprehensive plugin for [EDMC](https://github.com/EDCD/EDMarketConnector) tha
 ## Screenshots
 
 ### Main Plugin Interface
-![Main Interface](https://i.imgur.com/AZejkZ3.png)
+![Main Interface](images/EDMarketConnector_drx9hplumD.png)
 
 ### Discord Webhook Notifications
-![Discord Webhook](https://i.imgur.com/4FalSe2.png)
+![Discord Webhook](images/Discord_Bk3s1Lv3hb.png)
 
 ### Settings Configuration
-![Settings Panel](https://i.imgur.com/oZLhR3q.png)
+![Settings Panel](images/EDMarketConnector_O2PCvN3fWH.png)
 
 ### Trading Analytics Display
-![Trading Analytics](https://i.imgur.com/uIAQksG.png)
+![Trading Analytics](images/EDMarketConnector_C5No070T0c.png)
 
 ### Cargo Racks Analysis
-![Cargo Racks](https://i.imgur.com/7TqoR8U.png)
+![Cargo Racks](images/EDMarketConnector_SlIbgoVy2W.png)
 
 ### Budget Tracking Interface
-![Budget Tracking](https://i.imgur.com/ytOctAN.png)
+![Budget Tracking](images/EDMarketConnector_g3Hyq6x2TU.png)
 
 ### Captain Information Display
-![Captain Info](https://i.imgur.com/AmR2TTe.png)
+![Captain Info](images/Discord_phbwKIYBLr.png)
 
 ## Installation
 
