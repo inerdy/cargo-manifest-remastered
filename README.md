@@ -37,7 +37,7 @@ A comprehensive plugin for [EDMC](https://github.com/EDCD/EDMarketConnector) tha
 
 ## Installation
 
-1. Download the [latest release](https://github.com/RemainNA/cargo-manifest/releases)
+1. Download the [latest release](https://github.com/inerdy/cargo-manifest-remastered/releases)
 2. Extract the zip folder to your EDMC plugin directory
    - Plugin directory can be located through EDMC settings
    - Default location: `%APPDATA%\EDMarketConnector\plugins\`
@@ -153,8 +153,6 @@ The plugin creates debug logs in the plugin directory for troubleshooting.
 ## Support
 
 - **GitHub Issues**: Report bugs and feature requests
-- **Discord**: RemainNA#0159/remainna
-- **EDMC Community**: [EDMC Discord](https://discord.gg/0gWzK7VHj8qjqjqj)
 
 ## License
 
