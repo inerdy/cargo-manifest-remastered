@@ -197,6 +197,32 @@ def plugin_start3(plugin_dir):
 		debug_log("Startup - No budget enabled setting found, defaulting to False")
 		this.budgetEnabled = False
 	
+	# Initialize community goals data
+	this.communityGoals = []
+	this.currentCommunityGoal = None
+	
+	# Try to get community goals from EDMC state
+	load_community_goals_from_edmc()
+	
+	# Set up periodic refresh of community goals (every 30 minutes)
+	def periodic_community_goals_refresh():
+		import threading
+		import time
+		
+		while True:
+			try:
+				time.sleep(1800)  # 30 minutes
+				debug_log("Periodic community goals refresh triggered")
+				fetch_community_goals_fallback()
+				update_community_goals_display()
+			except Exception as e:
+				debug_log(f"Error in periodic community goals refresh: {e}")
+	
+	# Start the background thread
+	refresh_thread = threading.Thread(target=periodic_community_goals_refresh, daemon=True)
+	refresh_thread.start()
+	debug_log("Started periodic community goals refresh thread")
+	
 
 	
 	
@@ -274,7 +300,7 @@ def plugin_app(parent):
     this.sectionDropdown = ttk.Combobox(
         this.frame,
         textvariable=this.sectionVar,
-        		values=["Manifest", "Captain Information", "Budget", "Cargo Racks"],
+        		values=["Manifest", "Captain Information", "Budget", "Cargo Racks", "Community Goals"],
         state="readonly",
         width=20,
         style=combobox_style
@@ -302,32 +328,49 @@ def plugin_app(parent):
     this.cargoRacksLabel = tk.Label(this.cargoRacksFrame, justify="left", anchor="w")
     this.cargoRacksLabel.pack(anchor="w", padx=4, pady=4)
 
+    # Community Goals Frame
+    this.communityGoalsFrame = tk.Frame(this.frame)
+    this.communityGoalsLabel = tk.Label(this.communityGoalsFrame, justify="left", anchor="w", wraplength=400)
+    this.communityGoalsLabel.pack(anchor="w", padx=4, pady=4)
+
     # Show only the selected frame
     def show_section(*_):
         if this.sectionVar.get() == "Manifest":
             this.captainInfoFrame.grid_forget()
             this.budgetFrame.grid_forget()
             this.cargoRacksFrame.grid_forget()
+            this.communityGoalsFrame.grid_forget()
             this.cargoManifestFrame.grid(row=1, column=0, sticky="nsew")
             update_cargo_manifest_display()
         elif this.sectionVar.get() == "Captain Information":
             this.cargoManifestFrame.grid_forget()
             this.budgetFrame.grid_forget()
             this.cargoRacksFrame.grid_forget()
+            this.communityGoalsFrame.grid_forget()
             this.captainInfoFrame.grid(row=1, column=0, sticky="nsew")
             update_captain_info_display()
         elif this.sectionVar.get() == "Budget":
             this.cargoManifestFrame.grid_forget()
             this.captainInfoFrame.grid_forget()
             this.cargoRacksFrame.grid_forget()
+            this.communityGoalsFrame.grid_forget()
             this.budgetFrame.grid(row=1, column=0, sticky="nsew")
             update_budget_display()
         elif this.sectionVar.get() == "Cargo Racks":
             this.cargoManifestFrame.grid_forget()
             this.captainInfoFrame.grid_forget()
             this.budgetFrame.grid_forget()
+            this.communityGoalsFrame.grid_forget()
             this.cargoRacksFrame.grid(row=1, column=0, sticky="nsew")
             update_cargo_racks_display()
+        elif this.sectionVar.get() == "Community Goals":
+            debug_log("Switching to Community Goals section")
+            this.cargoManifestFrame.grid_forget()
+            this.captainInfoFrame.grid_forget()
+            this.budgetFrame.grid_forget()
+            this.cargoRacksFrame.grid_forget()
+            this.communityGoalsFrame.grid(row=1, column=0, sticky="nsew")
+            update_community_goals_display()
 
     this.sectionDropdown.bind("<<ComboboxSelected>>", show_section)
 
@@ -709,6 +752,11 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		# Update budget display when credits change from sales
 		if this.budgetEnabled:
 			update_budget_display()
+		
+		# Refresh community goals after selling cargo (might be related to community goals)
+		fetch_community_goals_fallback()
+		update_community_goals_display()
+		
 		# Update Discord status when trading
 		if this.enableDiscordRPC:
 			update_discord_status()
@@ -725,6 +773,11 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		# Update budget display when credits change from purchases
 		if this.budgetEnabled:
 			update_budget_display()
+		
+		# Refresh community goals after buying cargo (might be related to community goals)
+		fetch_community_goals_fallback()
+		update_community_goals_display()
+		
 		# Update Discord status when trading
 		if this.enableDiscordRPC:
 			update_discord_status()
@@ -816,6 +869,11 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 			update_captain_info_display()
 			if this.budgetEnabled:
 				update_budget_display()
+	
+	elif entry['event'] == 'CommunityGoal':
+		# Emitted when community goal data is received
+		debug_log(f"CommunityGoal event received: {entry}")
+		handle_community_goal(entry)
 	
 	elif entry['event'] == 'LoadGame':
 		# Emitted when loading into the game
@@ -978,6 +1036,9 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		# Update Discord status when game starts up
 		if this.enableDiscordRPC:
 			update_discord_status()
+		
+		# Check for community goals in state
+		check_state_for_community_goals(state)
 
 def detect_cargo_type(modules):
 	"""Detect cargo type based on installed modules"""
@@ -1675,9 +1736,336 @@ def update_cargo_racks_display():
 	
 	this.cargoRacksLabel.config(text=racks_text)
 
+def handle_community_goal(entry):
+	"""Handle CommunityGoal journal event"""
+	debug_log(f"Processing community goal: {entry}")
+	debug_log(f"Community goal keys: {list(entry.keys())}")
+	
+	# Check if the entry contains CurrentGoals array
+	if 'CurrentGoals' in entry and isinstance(entry['CurrentGoals'], list):
+		debug_log(f"Found CurrentGoals array with {len(entry['CurrentGoals'])} goals")
+		
+		for goal in entry['CurrentGoals']:
+			debug_log(f"Processing individual goal: {goal}")
+			debug_log(f"Individual goal keys: {list(goal.keys())}")
+			
+			# Extract data from the individual goal object
+			goal_id = goal.get('CGID', 0)
+			goal_name = goal.get('Title', 'Unknown Goal')
+			goal_system = goal.get('SystemName', 'Unknown System')
+			goal_station = goal.get('MarketName', 'Unknown Station')
+			goal_end_date = goal.get('Expiry', 'Unknown')
+			
+			# Get player's contribution and rank
+			player_contribution = goal.get('PlayerContribution', 0)
+			player_percent = goal.get('PlayerPercentileBand', 0)
+			player_rank = 0  # Not provided in this format
+			
+			# Get global contribution
+			global_contribution = goal.get('CurrentTotal', 0)
+			
+			# Get tier information
+			tier_reached = goal.get('TierReached', '')
+			top_tier = goal.get('TopTier', {})
+			tier_name = top_tier.get('Name', '') if isinstance(top_tier, dict) else ''
+			
+			debug_log(f"Parsed goal data - ID: {goal_id}, Name: {goal_name}, System: {goal_system}, Station: {goal_station}")
+			debug_log(f"Player data - Contribution: {player_contribution}, Percent: {player_percent}, Tier: {tier_reached}")
+			
+			# Store community goal data
+			goal_data = {
+				'id': goal_id,
+				'name': goal_name,
+				'description': '',  # Not provided in this format
+				'system': goal_system,
+				'station': goal_station,
+				'end_date': goal_end_date,
+				'player_contribution': player_contribution,
+				'player_percent': player_percent,
+				'player_rank': player_rank,
+				'global_contribution': global_contribution,
+				'tier': tier_reached,
+				'target_tier': tier_name,
+				'is_from_game': True
+			}
+			
+			# Update or add to community goals list
+			found = False
+			for i, existing_goal in enumerate(this.communityGoals):
+				if existing_goal['id'] == goal_id:
+					this.communityGoals[i] = goal_data
+					found = True
+					debug_log(f"Updated existing community goal: {goal_name}")
+					break
+			
+			if not found:
+				this.communityGoals.append(goal_data)
+				debug_log(f"Added new community goal: {goal_name}")
+		
+		# Update display
+		update_community_goals_display()
+		debug_log(f"Community goals updated from CurrentGoals array")
+	else:
+		# Fallback to old format
+		debug_log("No CurrentGoals array found, using fallback parsing")
+		
+		# Try different possible field names for community goal data
+		goal_id = entry.get('CGID', entry.get('CommunityGoalID', entry.get('ID', 0)))
+		goal_name = entry.get('Name', entry.get('CommunityGoalName', entry.get('Title', 'Unknown Goal')))
+		goal_description = entry.get('Description', entry.get('Objective', ''))
+		goal_system = entry.get('SystemName', entry.get('System', 'Unknown System'))
+		goal_station = entry.get('StationName', entry.get('Station', 'Unknown Station'))
+		goal_end_date = entry.get('EndDate', entry.get('ExpiryDate', 'Unknown'))
+		
+		# Get player's contribution and rank - try multiple field names
+		player_contribution = entry.get('PlayerContribution', entry.get('Contribution', entry.get('Units', 0)))
+		player_percent = entry.get('PlayerPercentileBand', entry.get('Percentile', entry.get('RankPercent', 0)))
+		player_rank = entry.get('PlayerRank', entry.get('Rank', entry.get('Position', 0)))
+		
+		# Also check for tier information
+		tier = entry.get('Tier', entry.get('CurrentTier', 0))
+		target_tier = entry.get('TargetTier', entry.get('MaxTier', 0))
+		
+		debug_log(f"Parsed goal data - ID: {goal_id}, Name: {goal_name}, System: {goal_system}, Station: {goal_station}")
+		debug_log(f"Player data - Contribution: {player_contribution}, Rank: {player_rank}, Percent: {player_percent}")
+		
+		# Store community goal data
+		goal_data = {
+			'id': goal_id,
+			'name': goal_name,
+			'description': goal_description,
+			'system': goal_system,
+			'station': goal_station,
+			'end_date': goal_end_date,
+			'player_contribution': player_contribution,
+			'player_percent': player_percent,
+			'player_rank': player_rank,
+			'tier': tier,
+			'target_tier': target_tier,
+			'is_from_game': True
+		}
+		
+		# Update or add to community goals list
+		found = False
+		for i, existing_goal in enumerate(this.communityGoals):
+			if existing_goal['id'] == goal_id:
+				this.communityGoals[i] = goal_data
+				found = True
+				debug_log(f"Updated existing community goal: {goal_name}")
+				break
+		
+		if not found:
+			this.communityGoals.append(goal_data)
+			debug_log(f"Added new community goal: {goal_name}")
+		
+		# Update display
+		update_community_goals_display()
+		debug_log(f"Community goal updated: {goal_name}")
 
+def load_community_goals_from_edmc():
+	"""Load community goals from EDMC state"""
+	debug_log("Loading community goals from EDMC state")
+	
+	try:
+		# Try to get community goals from EDMC's state
+		from config import config
+		
+		# Check if EDMC has community goals data
+		edmc_community_goals = config.get('communitygoals', [])
+		if edmc_community_goals:
+			debug_log(f"Found {len(edmc_community_goals)} community goals in EDMC state")
+			
+			for goal in edmc_community_goals:
+				goal_data = {
+					'id': goal.get('id', 0),
+					'name': goal.get('name', 'Unknown Goal'),
+					'description': goal.get('description', ''),
+					'system': goal.get('system', 'Unknown System'),
+					'station': goal.get('station', 'Unknown Station'),
+					'end_date': goal.get('endDate', 'Unknown'),
+					'player_contribution': goal.get('contribution', 0),
+					'player_percent': goal.get('percentile', 0),
+					'player_rank': goal.get('rank', 0),
+					'is_edmc': True
+				}
+				
+				this.communityGoals.append(goal_data)
+				debug_log(f"Added EDMC community goal: {goal_data['name']}")
+			
+			# Update display
+			update_community_goals_display()
+		else:
+			debug_log("No community goals found in EDMC state")
+			
+	except Exception as e:
+		debug_log(f"Error loading community goals from EDMC: {e}")
+		# Fallback to external API if EDMC doesn't have data
+		fetch_community_goals_fallback()
 
+def fetch_community_goals_fallback():
+	"""Fallback to fetch community goals from external APIs if EDMC doesn't have data"""
+	debug_log("Using fallback to external API for community goals")
+	
+	try:
+		import requests
+		import threading
+		
+		def fetch_inara_goals():
+			try:
+				url = "https://inara.cz/api/v1/communitygoals"
+				response = requests.get(url, timeout=10)
+				if response.status_code == 200:
+					data = response.json()
+					if 'communityGoals' in data:
+						goals = data['communityGoals']
+						debug_log(f"Fetched {len(goals)} community goals from Inara")
+						
+						# Process and store community goals
+						for goal in goals:
+							if goal.get('isActive', False):
+								goal_data = {
+									'id': goal.get('communitygoalGameID', 0),
+									'name': goal.get('communitygoalName', 'Unknown Goal'),
+									'description': goal.get('communitygoalDescription', ''),
+									'system': goal.get('starsystemName', 'Unknown System'),
+									'station': goal.get('stationName', 'Unknown Station'),
+									'end_date': goal.get('endDate', 'Unknown'),
+									'player_contribution': 0,  # Will be updated from game events
+									'player_percent': 0,
+									'player_rank': 0,
+									'is_external': True
+								}
+								
+								# Add to community goals list if not already present
+								found = False
+								for existing_goal in this.communityGoals:
+									if existing_goal['id'] == goal_data['id']:
+										found = True
+										break
+								
+								if not found:
+									this.communityGoals.append(goal_data)
+									debug_log(f"Added community goal: {goal_data['name']}")
+						
+						# Update display
+						update_community_goals_display()
+					else:
+						debug_log("No community goals found in Inara response")
+				else:
+					debug_log(f"Inara API request failed with status {response.status_code}")
+			except Exception as e:
+				debug_log(f"Error fetching community goals from Inara: {e}")
+		
+		# Run the fetch in a background thread to avoid blocking startup
+		fetch_thread = threading.Thread(target=fetch_inara_goals, daemon=True)
+		fetch_thread.start()
+		
+	except Exception as e:
+		debug_log(f"Error setting up community goals fallback: {e}")
 
+def check_state_for_community_goals(state):
+	"""Check for community goals in the game state"""
+	debug_log("Checking state for community goals")
+	debug_log(f"State keys: {list(state.keys())}")
+	
+	# Look for community goal related keys in state
+	community_goal_keys = [key for key in state.keys() if 'community' in key.lower() or 'goal' in key.lower()]
+	debug_log(f"Potential community goal keys: {community_goal_keys}")
+	
+	for key in community_goal_keys:
+		debug_log(f"Community goal key '{key}': {state[key]}")
+	
+	# Check if there are any community goals in the state
+	if 'CommunityGoals' in state:
+		debug_log(f"Found CommunityGoals in state: {state['CommunityGoals']}")
+		for goal in state['CommunityGoals']:
+			handle_community_goal(goal)
+	elif 'communitygoals' in state:
+		debug_log(f"Found communitygoals in state: {state['communitygoals']}")
+		for goal in state['communitygoals']:
+			handle_community_goal(goal)
+
+def update_community_goals_display():
+	"""Update the community goals display"""
+	debug_log("Updating community goals display")
+	
+	if not hasattr(this, 'communityGoalsLabel'):
+		return  # UI not initialized yet
+	
+	debug_log(f"Number of community goals: {len(this.communityGoals)}")
+	for i, goal in enumerate(this.communityGoals):
+		debug_log(f"Goal {i+1}: {goal}")
+	
+	goals_text = "🎯 Community Goals\n\n"
+	
+	debug_log(f"Building goals text. Number of goals: {len(this.communityGoals)}")
+	
+	if not this.communityGoals:
+		goals_text += "No active community goals found.\n"
+		goals_text += "Check the mission board for available community goals."
+	else:
+		debug_log(f"Processing {len(this.communityGoals)} goals for display")
+		for i, goal in enumerate(this.communityGoals, 1):
+			debug_log(f"Processing goal {i}: {goal['name']}")
+			try:
+				goals_text += f"🎯 {goal['name']}\n"
+				debug_log("Added goal name")
+				goals_text += f"📍 Location: {goal['station']}, {goal['system']}\n"
+				debug_log("Added location")
+				goals_text += f"📅 End Date: {goal['end_date']}\n"
+				debug_log("Added end date")
+				
+				# Show tier information if available
+				if goal.get('tier'):
+					goals_text += f"🏆 Current Tier: {goal['tier']}"
+					if goal.get('target_tier'):
+						goals_text += f" / {goal['target_tier']}"
+					goals_text += "\n"
+					debug_log("Added tier info")
+				
+				# Show global contribution if available
+				if goal.get('global_contribution', 0) > 0:
+					goals_text += f"🌍 Global Contribution: {goal['global_contribution']:,}\n"
+					debug_log("Added global contribution info")
+				
+				# Show player contribution if available
+				if goal.get('player_contribution', 0) > 0:
+					goals_text += f"📊 Your Contribution: {goal['player_contribution']:,}\n"
+					goals_text += f"🏆 Your Rank: Top {goal['player_percent']}%\n"
+					debug_log("Added player contribution info")
+				else:
+					goals_text += f"📊 Your Contribution: Not participating\n"
+					debug_log("Added not participating message")
+				
+				if goal['description']:
+					goals_text += f"📝 Description: {goal['description']}\n"
+					debug_log("Added description")
+				
+				# Indicate data source
+				if goal.get('is_from_game', False):
+					##goals_text += f"🎮 Data from game events\n"
+					debug_log("Added game events source")
+				elif goal.get('is_edmc', False):
+					goals_text += f"📡 Data from EDMC\n"
+					debug_log("Added EDMC source")
+				elif goal.get('is_external', False):
+					goals_text += f"🌐 Data from external API\n"
+					debug_log("Added external API source")
+				
+				goals_text += "\n"
+				debug_log("Finished processing goal")
+			except Exception as e:
+				debug_log(f"Error processing goal: {e}")
+				import traceback
+				debug_log(f"Traceback: {traceback.format_exc()}")
+	
+	# Update the label
+	debug_log(f"About to update label with text length: {len(goals_text)}")
+	this.communityGoalsLabel.config(text=goals_text)
+	debug_log(f"Community goals display updated with text: {goals_text[:200]}...")
+	
+	# Force update the display
+	this.communityGoalsLabel.update()
 
 def update_display():
 	# Update both sections so switching is always instant
@@ -1685,6 +2073,7 @@ def update_display():
 	update_cargo_manifest_display()
 	update_budget_display()
 	update_cargo_racks_display()
+	update_community_goals_display()
 	# No need to set manifest or title here
 	# Frame switching is handled by the combobox
 	pass
