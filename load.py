@@ -17,6 +17,16 @@ this = sys.modules[__name__]  # For holding module globals
 
 def debug_log(message):
 	"""Write debug messages to a log file"""
+	# Check if debug logging is enabled - check both the global setting and the UI variable
+	debug_enabled = False
+	if hasattr(this, 'enableDebugLogging'):
+		debug_enabled = this.enableDebugLogging
+	if hasattr(this, 'enableDebugLoggingVar'):
+		debug_enabled = debug_enabled or this.enableDebugLoggingVar.get()
+	
+	if not debug_enabled:
+		return  # Skip logging if debug logging is disabled
+	
 	try:
 		directoryName = path.basename(path.dirname(__file__)) or 'CargoManifest'
 		pluginPath = path.join(config.plugin_dir, directoryName)
@@ -60,6 +70,7 @@ this.lastStatusUpdate = 0  # Timestamp of last status update for rate limiting
 this.budgetGoal = 0  # Credit goal for budget tracking
 this.budgetEnabled = False  # Whether budget tracking is enabled
 this.cargoRacks = []  # List of equipped cargo racks with their details
+this.enableDebugLogging = False  # Whether debug logging is enabled
 
 this.version = 'v3.0.3'
 
@@ -286,6 +297,15 @@ def plugin_start3(plugin_dir):
 	except:
 		debug_log("Startup - No budget enabled setting found, defaulting to False")
 		this.budgetEnabled = False
+	
+	# Load debug logging setting
+	try:
+		debugLoggingValue = config.get_bool("cm_enableDebugLogging")
+		debug_log(f"Startup - Loaded debug logging enabled: {debugLoggingValue}")
+		this.enableDebugLogging = debugLoggingValue
+	except:
+		debug_log("Startup - No debug logging setting found, defaulting to False")
+		this.enableDebugLogging = False
 	
 	# Initialize community goals data
 	this.communityGoals = []
@@ -588,6 +608,15 @@ def plugin_prefs(parent, cmdr, is_beta):
 		debug_log("No budget enabled setting found, defaulting to False")
 	this.budgetEnabledVar = tk.BooleanVar(value=budgetEnabledValue)
 	
+	# Handle debug logging setting
+	try:
+		debugLoggingValue = config.get_bool("cm_enableDebugLogging")
+		debug_log(f"Loaded debug logging enabled: {debugLoggingValue}")
+	except:
+		debugLoggingValue = False
+		debug_log("No debug logging setting found, defaulting to False")
+	this.enableDebugLoggingVar = tk.BooleanVar(value=debugLoggingValue)
+	
 
 	
 	# Title and version
@@ -634,12 +663,18 @@ def plugin_prefs(parent, cmdr, is_beta):
 	budgetGoalEntry.grid(sticky="w", pady=(2, 5))
 	tk.Label(scrollable_frame, text="Set your target credit amount (supports large numbers like 1,000,000,000)", background=nb.Label().cget('background'), foreground="gray").grid(sticky="w", pady=(0, 5))
 	
+	# Debug Settings
+	tk.Label(scrollable_frame, text="Debug Settings:", background=nb.Label().cget('background'), font=("TkDefaultFont", 9, "bold")).grid(sticky="w", pady=(15, 5))
+	tk.Checkbutton(scrollable_frame, text="Enable debug logging", variable=this.enableDebugLoggingVar, background=nb.Label().cget('background')).grid(sticky="w", pady=1)
+	tk.Label(scrollable_frame, text="Logs detailed information to debug.log for troubleshooting", background=nb.Label().cget('background'), foreground="gray").grid(sticky="w", pady=(0, 5))
+	
 
 	
 	# Credits section
 	tk.Label(scrollable_frame, text="", background=nb.Label().cget('background')).grid(sticky="w", pady=(20, 5))  # Spacer
 	tk.Label(scrollable_frame, text="Credits:", background=nb.Label().cget('background'), font=("TkDefaultFont", 9, "bold")).grid(sticky="w", pady=(0, 5))
 	HyperlinkLabel(scrollable_frame, text="Original plugin by RemainNA", background=nb.Label().cget('background'), url="https://github.com/RemainNA/cargo-manifest").grid(sticky="w", pady=(0, 5))
+	HyperlinkLabel(scrollable_frame, text="Remastered by iNerdy", background=nb.Label().cget('background'), url="https://github.com/inerdy/cargo-manifest-remastered").grid(sticky="w", pady=(0, 5))
 	
 	return frame
 
@@ -669,6 +704,10 @@ def prefs_changed(cmdr, is_beta):
 		config.set("cm_budgetEnabled", this.budgetEnabledVar.get())
 	if hasattr(this, 'budgetGoalVar'):
 		config.set("cm_budgetGoal", this.budgetGoalVar.get())
+	if hasattr(this, 'enableDebugLoggingVar'):
+		config.set("cm_enableDebugLogging", this.enableDebugLoggingVar.get())
+		# Update the global setting immediately so debug_log() works right away
+		this.enableDebugLogging = this.enableDebugLoggingVar.get()
 
 
 	
