@@ -641,6 +641,8 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		if 'Rank' in state:
 			update_ranks(state['Rank'])
 		update_display()
+		# Update captain info display specifically to ensure ranks are shown
+		update_captain_info_display()
 		# Update cargo manifest display specifically to ensure cargo data is shown
 		update_cargo_manifest_display()
 		# Update Discord status when cargo changes
@@ -667,6 +669,8 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		debug_log(f"Rank event received: {entry}")  # Debug
 		update_ranks(entry)
 		update_display()
+		# Update captain info display specifically to ensure ranks are shown
+		update_captain_info_display()
 		# Update Discord status when ranks change (progression)
 		if this.enableDiscordRPC:
 			update_discord_status()
@@ -677,14 +681,34 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		if 'Credits' in entry:
 			update_credits(entry['Credits'])
 			update_display()
+			# Update captain info display specifically to ensure credits are shown
+			update_captain_info_display()
+			# Update budget display when credits change
+			if this.budgetEnabled:
+				update_budget_display()
 			# Update Discord status when credits change (trading activity)
 			if this.enableDiscordRPC:
 				update_discord_status()
+		# Also check state for credits (in case entry doesn't have them)
+		elif 'Credits' in state and state['Credits'] != this.credits:
+			debug_log(f"Credits updated from state during Credits event: {state['Credits']} (was: {this.credits})")
+			update_credits(state['Credits'])
+			update_captain_info_display()
+			if this.budgetEnabled:
+				update_budget_display()
 	
 	elif entry['event'] == 'MarketSell':
 		# Emitted when cargo is sold at market
 		debug_log(f"MarketSell event received: {entry}")  # Debug
 		handle_market_sell(entry)
+		# Update credits from state if available
+		if 'Credits' in state and state['Credits'] != this.credits:
+			debug_log(f"Credits updated from state after MarketSell: {state['Credits']} (was: {this.credits})")
+			update_credits(state['Credits'])
+			update_captain_info_display()
+		# Update budget display when credits change from sales
+		if this.budgetEnabled:
+			update_budget_display()
 		# Update Discord status when trading
 		if this.enableDiscordRPC:
 			update_discord_status()
@@ -693,6 +717,14 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		# Emitted when cargo is bought at market
 		debug_log(f"MarketBuy event received: {entry}")  # Debug
 		handle_market_buy(entry)
+		# Update credits from state if available
+		if 'Credits' in state and state['Credits'] != this.credits:
+			debug_log(f"Credits updated from state after MarketBuy: {state['Credits']} (was: {this.credits})")
+			update_credits(state['Credits'])
+			update_captain_info_display()
+		# Update budget display when credits change from purchases
+		if this.budgetEnabled:
+			update_budget_display()
 		# Update Discord status when trading
 		if this.enableDiscordRPC:
 			update_discord_status()
@@ -769,9 +801,21 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 			debug_log(f"Commander - Credits: {entry['Credits']}")
 			update_credits(entry['Credits'])
 		update_display()
+		# Update captain info display specifically to ensure commander data is shown
+		update_captain_info_display()
+		# Update budget display when credits change from commander data
+		if this.budgetEnabled:
+			update_budget_display()
 		# Update Discord status when commander data is loaded
 		if this.enableDiscordRPC:
 			update_discord_status()
+		# Also check state for credits
+		if 'Credits' in state and state['Credits'] != this.credits:
+			debug_log(f"Credits updated from state during Commander event: {state['Credits']} (was: {this.credits})")
+			update_credits(state['Credits'])
+			update_captain_info_display()
+			if this.budgetEnabled:
+				update_budget_display()
 	
 	elif entry['event'] == 'LoadGame':
 		# Emitted when loading into the game
@@ -785,6 +829,11 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 			debug_log(f"Commander name updated from LoadGame event: {this.commanderName}")
 		else:
 			debug_log(f"LoadGame event received but no commander name found")
+		# Update credits from state if available
+		if 'Credits' in state and state['Credits'] != this.credits:
+			debug_log(f"Credits updated from state during LoadGame: {state['Credits']} (was: {this.credits})")
+			update_credits(state['Credits'])
+			update_captain_info_display()
 		# Update Discord status when loading into the game
 		if this.enableDiscordRPC:
 			update_discord_status()
@@ -919,6 +968,8 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		update_display()
 		# Update cargo manifest display specifically to ensure it loads properly
 		update_cargo_manifest_display()
+		# Update captain info display specifically to ensure commander data is shown
+		update_captain_info_display()
 		# Update cargo racks display specifically to ensure racks are shown
 		update_cargo_racks_display()
 		# Update budget display if enabled
