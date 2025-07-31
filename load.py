@@ -1710,6 +1710,11 @@ def handle_market_sell(entry):
 		"inline": True
 	})
 	
+	embed["footer"] = {
+		"text": "Cargo Manifest Bot"
+	}
+	embed["timestamp"] = datetime.utcnow().isoformat()
+	
 	debug_log(f"Sending webhook embed for sale")
 	send_discord_webhook(this.webhookUrl, None, embed)
 
@@ -1789,7 +1794,7 @@ def handle_market_buy(entry):
 		"footer": {
 			"text": "Cargo Manifest Bot"
 		},
-		"timestamp": datetime.now().isoformat()
+		"timestamp": datetime.utcnow().isoformat()
 	}
 	
 	# Add thumbnail if avatar URL is provided
@@ -2428,7 +2433,7 @@ def update_discord_status():
 			"footer": {
 				"text": "Elite Dangerous - Cargo Manifest Remastered"
 			},
-			"timestamp": datetime.now().isoformat()
+			"timestamp": datetime.utcnow().isoformat()
 		}
 		
 		# Send status update via webhook
