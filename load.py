@@ -45,6 +45,8 @@ this.webhookUrl = ""
 this.enableWebhooks = False
 this.currentStation = "Unknown"
 this.currentSystem = "Unknown"
+this.currentShipName = "Unknown"
+this.currentShipType = "Unknown"
 this.purchaseHistory = {}  # Track cargo purchases: {cargo_name: {quantity: int, avg_price: float, total_cost: int}}
 this.commanderName = "Unknown"
 this.webhookAvatar = ""  # Custom avatar URL for webhook
@@ -72,6 +74,94 @@ def checkVersion():
 	if data['tag_name'] == this.version:
 		return 1 # Newest
 	return 0 # Newer version available
+
+def get_ship_type(ship_name):
+	"""Convert ship name to ship type"""
+	ship_type_map = {
+		'Anaconda': 'Anaconda',
+		'Python': 'Python',
+		'Krait Phantom': 'Krait Phantom',
+		'Krait MkII': 'Krait MkII',
+		'Krait': 'Krait',
+		'Asp Explorer': 'Asp Explorer',
+		'Asp Scout': 'Asp Scout',
+		'Diamondback Explorer': 'Diamondback Explorer',
+		'Diamondback Scout': 'Diamondback Scout',
+		'Vulture': 'Vulture',
+		'Fer-de-Lance': 'Fer-de-Lance',
+		'Federal Corvette': 'Federal Corvette',
+		'Federal Gunship': 'Federal Gunship',
+		'Federal Assault Ship': 'Federal Assault Ship',
+		'Federal Dropship': 'Federal Dropship',
+		'Imperial Cutter': 'Imperial Cutter',
+		'Imperial Clipper': 'Imperial Clipper',
+		'Imperial Courier': 'Imperial Courier',
+		'Imperial Eagle': 'Imperial Eagle',
+		'Eagle': 'Eagle',
+		'Sidewinder': 'Sidewinder',
+		'Cobra MkIII': 'Cobra MkIII',
+		'Cobra MkIV': 'Cobra MkIV',
+		'Viper': 'Viper',
+		'Viper MkIV': 'Viper MkIV',
+		'Adder': 'Adder',
+		'Hauler': 'Hauler',
+		'Type-6 Transporter': 'Type-6 Transporter',
+		'Type-7 Transporter': 'Type-7 Transporter',
+		'Type-9 Heavy': 'Type-9 Heavy',
+		'Type-10 Defender': 'Type-10 Defender',
+		'Alliance Chieftain': 'Alliance Chieftain',
+		'Alliance Crusader': 'Alliance Crusader',
+		'Alliance Challenger': 'Alliance Challenger',
+		'Keelback': 'Keelback',
+		'Dolphin': 'Dolphin',
+		'Orca': 'Orca',
+		'Beluga Liner': 'Beluga Liner',
+		'Vulture': 'Vulture',
+		'FDL': 'Fer-de-Lance',
+		'FdL': 'Fer-de-Lance',
+		'Corvette': 'Federal Corvette',
+		'Cutter': 'Imperial Cutter',
+		'Clipper': 'Imperial Clipper',
+		'Courier': 'Imperial Courier',
+		'Gunship': 'Federal Gunship',
+		'Dropship': 'Federal Dropship',
+		'Assault Ship': 'Federal Assault Ship',
+		'Chieftain': 'Alliance Chieftain',
+		'Crusader': 'Alliance Crusader',
+		'Challenger': 'Alliance Challenger',
+		'Phantom': 'Krait Phantom',
+		'MkII': 'Krait MkII',
+		'Mk II': 'Krait MkII',
+		'Panther Mk II': 'Panther Mk II',
+		'PantherMkII': 'Panther Mk II',
+		'panthermkii': 'Panther Mk II',
+		'Scout': 'Asp Scout',
+		'Explorer': 'Asp Explorer',
+		'DBX': 'Diamondback Explorer',
+		'DBS': 'Diamondback Scout',
+		'DB Scout': 'Diamondback Scout',
+		'DB Explorer': 'Diamondback Explorer',
+		'Type-6': 'Type-6 Transporter',
+		'Type-7': 'Type-7 Transporter',
+		'Type-9': 'Type-9 Heavy',
+		'Type-10': 'Type-10 Defender',
+		'T6': 'Type-6 Transporter',
+		'T7': 'Type-7 Transporter',
+		'T9': 'Type-9 Heavy',
+		'T10': 'Type-10 Defender'
+	}
+	
+	# Try exact match first
+	if ship_name in ship_type_map:
+		return ship_type_map[ship_name]
+	
+	# Try partial matches
+	for key, value in ship_type_map.items():
+		if key.lower() in ship_name.lower():
+			return value
+	
+	# If no match found, return the original ship name
+	return ship_name
 
 def get_current_commander():
 	"""Try to get the current commander name from various sources"""
@@ -743,7 +833,20 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 	elif entry['event'] == 'MarketSell':
 		# Emitted when cargo is sold at market
 		debug_log(f"MarketSell event received: {entry}")  # Debug
+		
+		# Update ship information from state BEFORE sending webhook
+		if 'ShipType' in state and state['ShipType'] and state['ShipType'] != this.currentShipType:
+			this.currentShipType = state['ShipType']
+			debug_log(f"Ship type updated from state: {this.currentShipType}")
+		
+		if 'ShipName' in state and state['ShipName'] and state['ShipName'] != this.currentShipName:
+			this.currentShipName = state['ShipName']
+			debug_log(f"Ship name updated from state: {this.currentShipName}")
+		
+		debug_log(f"MarketSell - Ship info before webhook: {this.currentShipName} ({this.currentShipType})")
+		
 		handle_market_sell(entry)
+		
 		# Update credits from state if available
 		if 'Credits' in state and state['Credits'] != this.credits:
 			debug_log(f"Credits updated from state after MarketSell: {state['Credits']} (was: {this.credits})")
@@ -764,7 +867,20 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 	elif entry['event'] == 'MarketBuy':
 		# Emitted when cargo is bought at market
 		debug_log(f"MarketBuy event received: {entry}")  # Debug
+		
+		# Update ship information from state BEFORE sending webhook
+		if 'ShipType' in state and state['ShipType'] and state['ShipType'] != this.currentShipType:
+			this.currentShipType = state['ShipType']
+			debug_log(f"Ship type updated from state: {this.currentShipType}")
+		
+		if 'ShipName' in state and state['ShipName'] and state['ShipName'] != this.currentShipName:
+			this.currentShipName = state['ShipName']
+			debug_log(f"Ship name updated from state: {this.currentShipName}")
+		
+		debug_log(f"MarketBuy - Ship info before webhook: {this.currentShipName} ({this.currentShipType})")
+		
 		handle_market_buy(entry)
+		
 		# Update credits from state if available
 		if 'Credits' in state and state['Credits'] != this.credits:
 			debug_log(f"Credits updated from state after MarketBuy: {state['Credits']} (was: {this.credits})")
@@ -870,21 +986,31 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 			if this.budgetEnabled:
 				update_budget_display()
 	
-	elif entry['event'] == 'CommunityGoal':
-		# Emitted when community goal data is received
-		debug_log(f"CommunityGoal event received: {entry}")
-		handle_community_goal(entry)
-	
 	elif entry['event'] == 'LoadGame':
-		# Emitted when loading into the game
-		debug_log(f"LoadGame event received: {entry}")
+		# Emitted when loading into the game, contains ship information
+		debug_log(f"LoadGame event received: {entry}")  # Debug
 		debug_log(f"LoadGame event keys: {list(entry.keys())}")
+		
+		# Update ship information
+		if 'ShipType' in entry and entry['ShipType'] and entry['ShipType'] != 'None':
+			this.currentShipType = entry['ShipType']
+			debug_log(f"Ship type updated from LoadGame: {this.currentShipType}")
+		
+		if 'Ship' in entry and entry['Ship'] and entry['Ship'] != 'None':
+			this.currentShipName = entry['Ship']
+			debug_log(f"Ship name updated from LoadGame: {this.currentShipName}")
+		elif 'ShipIdent' in entry and entry['ShipIdent'] and entry['ShipIdent'] != 'None':
+			this.currentShipName = entry['ShipIdent']
+			debug_log(f"Ship name updated from LoadGame ShipIdent: {this.currentShipName}")
+		
+		debug_log(f"LoadGame - Final ship info: {this.currentShipName} ({this.currentShipType})")
+		if 'ShipID' in entry:
+			debug_log(f"Ship ID from LoadGame: {entry['ShipID']}")
+		
+		# Update commander name if available
 		if 'Commander' in entry:
 			this.commanderName = entry['Commander']
-			debug_log(f"Commander name updated from LoadGame event: {this.commanderName}")
-		elif 'Name' in entry:
-			this.commanderName = entry['Name']
-			debug_log(f"Commander name updated from LoadGame event: {this.commanderName}")
+			debug_log(f"Commander name updated from LoadGame: {this.commanderName}")
 		else:
 			debug_log(f"LoadGame event received but no commander name found")
 		# Update credits from state if available
@@ -895,6 +1021,44 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		# Update Discord status when loading into the game
 		if this.enableDiscordRPC:
 			update_discord_status()
+		
+		# Check for community goals in state
+		check_state_for_community_goals(state)
+	
+	elif entry['event'] == 'Loadout':
+		# Emitted when ship loadout changes, contains detailed ship information
+		debug_log(f"Loadout event received: {entry}")  # Debug
+		debug_log(f"Loadout event keys: {list(entry.keys())}")
+		
+		# Update ship information
+		if 'ShipType' in entry and entry['ShipType'] and entry['ShipType'] != 'None':
+			this.currentShipType = entry['ShipType']
+			debug_log(f"Ship type updated from Loadout: {this.currentShipType}")
+		
+		if 'Ship' in entry and entry['Ship'] and entry['Ship'] != 'None':
+			this.currentShipName = entry['Ship']
+			debug_log(f"Ship name updated from Loadout: {this.currentShipName}")
+		elif 'ShipIdent' in entry and entry['ShipIdent'] and entry['ShipIdent'] != 'None':
+			this.currentShipName = entry['ShipIdent']
+			debug_log(f"Ship name updated from Loadout ShipIdent: {this.currentShipName}")
+		elif 'ShipName' in entry and entry['ShipName'] and entry['ShipName'] != 'None':
+			this.currentShipName = entry['ShipName']
+			debug_log(f"Ship name updated from Loadout ShipName: {this.currentShipName}")
+		
+		debug_log(f"Loadout - Final ship info: {this.currentShipName} ({this.currentShipType})")
+		if 'ShipID' in entry:
+			debug_log(f"Ship ID from Loadout: {entry['ShipID']}")
+		
+		# Update Discord status when ship loadout changes
+		if this.enableDiscordRPC:
+			update_discord_status()
+	
+	elif entry['event'] == 'CommunityGoal':
+		# Emitted when community goal data is received
+		debug_log(f"CommunityGoal event received: {entry}")
+		handle_community_goal(entry)
+	
+
 	
 	elif entry['event'] == 'FileHeader':
 		# Emitted at the start of each journal file, often contains commander name
@@ -912,6 +1076,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 	
 	elif entry['event'] == 'StartUp':
 		# Tries to update display from EDMC stored data when started after the game
+		debug_log("StartUp event handler - Ship tracking section starting")
 		this.cargoDict = state['Cargo']
 		try:
 			this.inventory = state['CargoJSON']['Inventory'] # Only supported in 4.1.6 on
@@ -947,6 +1112,7 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		# Detect cargo type from modules
 		this.cargoType = detect_cargo_type(state['Modules'])
 		debug_log(f"Startup - Cargo type detected: {this.cargoType}, Cargo racks found: {len(this.cargoRacks)}")
+		debug_log("StartUp - Cargo detection complete, moving to ship tracking")
 		
 		# Load rank data from state
 		debug_log(f"StartUp state keys: {list(state.keys())}")  # Debug
@@ -1037,8 +1203,23 @@ def journal_entry(cmdr, is_beta, system, station, entry, state):
 		if this.enableDiscordRPC:
 			update_discord_status()
 		
-		# Check for community goals in state
-		check_state_for_community_goals(state)
+		# --- SHIP TRACKING SECTION: Always runs after cargo detection ---
+		ship_name = state.get('ShipName') or state.get('ShipIdent') or state.get('Ship') or None
+		ship_type = state.get('ShipType') or state.get('Ship') or None
+
+		if ship_name and ship_name != "None":
+			this.currentShipName = ship_name
+		else:
+			this.currentShipName = "Unknown"
+
+		if ship_type and ship_type != "None":
+			this.currentShipType = ship_type
+		else:
+			this.currentShipType = "Unknown"
+
+			debug_log(f"StartUp - Final ship name: {this.currentShipName}")
+	debug_log(f"StartUp - Final ship type: {this.currentShipType}")
+	debug_log(f"StartUp - Ship info for webhooks: {this.currentShipName} ({this.currentShipType})")
 
 def detect_cargo_type(modules):
 	"""Detect cargo type based on installed modules"""
@@ -1474,6 +1655,22 @@ def handle_market_sell(entry):
 		"inline": False
 	})
 	
+	# Add ship information
+	debug_log(f"Market sell - Ship name: '{this.currentShipName}', Ship type: '{this.currentShipType}'")
+	if this.currentShipName and this.currentShipName != "Unknown" and this.currentShipName != "None":
+		ship_info = f"{this.currentShipName}"
+		if this.currentShipType != "Unknown" and this.currentShipType != this.currentShipName:
+			ship_info += f" ({this.currentShipType})"
+	else:
+		ship_info = f"{this.currentShipType}" if this.currentShipType != "Unknown" else "Unknown Ship"
+	debug_log(f"Market sell - Final ship info: '{ship_info}'")
+	
+	embed["fields"].append({
+		"name": "🚀 Ship",
+		"value": ship_info,
+		"inline": True
+	})
+	
 	debug_log(f"Sending webhook embed for sale")
 	send_discord_webhook(this.webhookUrl, None, embed)
 
@@ -1499,6 +1696,16 @@ def handle_market_buy(entry):
 	
 	# Track the purchase for profit calculation
 	track_purchase(cargo_name, quantity, price_per_unit, total_price)
+	
+	# Add ship information
+	debug_log(f"Market buy - Ship name: '{this.currentShipName}', Ship type: '{this.currentShipType}'")
+	if this.currentShipName and this.currentShipName != "Unknown" and this.currentShipName != "None":
+		ship_info = f"{this.currentShipName}"
+		if this.currentShipType != "Unknown" and this.currentShipType != this.currentShipName:
+			ship_info += f" ({this.currentShipType})"
+	else:
+		ship_info = f"{this.currentShipType}" if this.currentShipType != "Unknown" else "Unknown Ship"
+	debug_log(f"Market buy - Final ship info: '{ship_info}'")
 	
 	# Create Discord embed
 	embed = {
@@ -1533,6 +1740,11 @@ def handle_market_buy(entry):
 				"name": "📍 Location",
 				"value": f"{station}, {system}",
 				"inline": False
+			},
+			{
+				"name": "🚀 Ship",
+				"value": ship_info,
+				"inline": True
 			}
 		],
 		"footer": {
@@ -2129,6 +2341,21 @@ def update_discord_status():
 		
 		# Add captain name
 		captain_info = f"Commander {this.commanderName}" if this.commanderName != "Unknown" else "Unknown Commander"
+		
+		# Add ship info if available
+		debug_log(f"Activity tracker - Ship name: '{this.currentShipName}', Ship type: '{this.currentShipType}'")
+		if this.currentShipName and this.currentShipName != "Unknown" and this.currentShipName != "None":
+			ship_info = f"Ship: {this.currentShipName}"
+			if this.currentShipType != "Unknown" and this.currentShipType != this.currentShipName:
+				ship_info += f" ({this.currentShipType})"
+			state += f" | {ship_info}"
+			debug_log(f"Activity tracker - Added ship info: {ship_info}")
+		elif this.currentShipType != "Unknown":
+			ship_info = f"Ship: {this.currentShipType}"
+			state += f" | {ship_info}"
+			debug_log(f"Activity tracker - Added ship type only: {ship_info}")
+		else:
+			debug_log("Activity tracker - No ship information available")
 		
 		# Add cargo info if available
 		if cargo_count > 0:
