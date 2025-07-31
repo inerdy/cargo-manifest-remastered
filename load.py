@@ -59,7 +59,7 @@ this.budgetGoal = 0  # Credit goal for budget tracking
 this.budgetEnabled = False  # Whether budget tracking is enabled
 this.cargoRacks = []  # List of equipped cargo racks with their details
 
-this.version = 'v3.0.1'
+this.version = 'v3.0.3'
 
 def checkVersion():
 	try:
